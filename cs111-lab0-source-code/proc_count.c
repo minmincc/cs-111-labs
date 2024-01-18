@@ -14,7 +14,9 @@ static int proc_count(struct seq_file *m, void *v){
 
     // Iterate through all the processes and increment the count
     for_each_process(task) {
-        process_count++;
+        if (task->state == TASK_RUNNING || task->state == TASK_INTERRUPTIBLE || task->state == TASK_UNINTERRUPTIBLE) {
+            process_count++;
+        }
     }
 
     // Write the number of processes to the seq_file
