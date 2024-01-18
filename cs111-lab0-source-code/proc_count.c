@@ -25,14 +25,14 @@ static int proc_count(struct seq_file *m, void *v){
 static int __init proc_count_init(void) {
     // Create the proc entry upon module initialization
     entry = proc_create_single("count", 0, NULL, proc_count);
-    pr_info("proc_count: Module loaded and /proc/count created\n");
+    //pr_info("proc_count: Module loaded and /proc/count created\n");
     return 0;
 }
 
 static void __exit proc_count_exit(void) {
     // Remove the proc entry upon module cleanup
     proc_remove(entry);
-    pr_info("proc_count: Module unloaded and /proc/count removed\n");
+    //pr_info("proc_count: Module unloaded and /proc/count removed\n");
 }
 
 module_init(proc_count_init);
