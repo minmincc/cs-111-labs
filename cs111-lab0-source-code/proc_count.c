@@ -25,8 +25,9 @@ static int proc_count(struct seq_file *m, void *v){
 
 static int __init proc_count_init(void) {
     // Create the proc entry upon module initialization
+	pr_info("proc_count: Module loaded and /proc/count created\n");
     entry = proc_create_single("count", 0, NULL, proc_count);
-    pr_info("proc_count: Module loaded and /proc/count created\n");
+    
     return 0;
 }
 
