@@ -39,5 +39,5 @@ module_init(proc_count_init);
 module_exit(proc_count_exit);
 
 MODULE_AUTHOR("Mingqi zhao");
-MODULE_DESCRIPTION("Count the current number of running processes");
+MODULE_DESCRIPTION("current number of running processes");
 MODULE_LICENSE("GPL");
