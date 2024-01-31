@@ -4,9 +4,10 @@
 #include <unistd.h>
 #include <sys/wait.h>
 
-void close_pipes(int pipes[], int num_pipes) {
-    for (int i = 0; i < num_pipes; i++) {
-        close(pipes[i]);
+void executeCommand(const char* cmd) {
+    if (execlp(cmd, cmd, NULL) < 0) {
+        perror("execlp");
+        exit(EXIT_FAILURE);
     }
 }
 
@@ -16,51 +17,55 @@ int main(int argc, char *argv[]) {
         exit(EINVAL);
     }
 
-    if (argc == 2) {
-        execlp(argv[1], argv[1], NULL);
-        perror("execlp");
-        exit(EXIT_FAILURE);
-    }
+    int pipe_fds[2]; // For pipe file descriptors
+    int prev_fd = -1; // For the read end of the previous pipe
 
-    int num_pipes = argc - 2;
-    int pipefds[2 * num_pipes];
-
-    for (int i = 0; i < num_pipes; i++) {
-        if (pipe(pipefds + i * 2) < 0) {
-            perror("pipe");
-            exit(EXIT_FAILURE);
+    for (int i = 1; i < argc; i++) {
+        if (i < argc - 1) {
+            if (pipe(pipe_fds) == -1) {
+                perror("pipe");
+                exit(EXIT_FAILURE);
+            }
         }
-    }
 
-    for (int i = 0; i < argc - 1; i++) {
         pid_t pid = fork();
-        if (pid < 0) {
+        if (pid == -1) {
             perror("fork");
             exit(EXIT_FAILURE);
         }
 
         if (pid == 0) {
-            if (i != 0) {
-                if (dup2(pipefds[(i - 1) * 2], STDIN_FILENO) < 0) {
-                    perror("dup2");
-                    exit(EXIT_FAILURE);
-                }
-            }
-            if (i != argc - 2) {
-                if (dup2(pipefds[i * 2 + 1], STDOUT_FILENO) < 0) {
-                    perror("dup2");
-                    exit(EXIT_FAILURE);
-                }
+            // Child process
+            if (prev_fd != -1) {
+                dup2(prev_fd, STDIN_FILENO);
+                close(prev_fd);
             }
 
-            close_pipes(pipefds, 2 * num_pipes);
-            execlp(argv[i + 1], argv[i + 1], NULL);
-            perror("execlp");
-            exit(EXIT_FAILURE);
+            if (i < argc - 1) {
+                close(pipe_fds[0]); // Close the read end of the pipe
+                dup2(pipe_fds[1], STDOUT_FILENO);
+                close(pipe_fds[1]); // Close the write end of the pipe
+            }
+
+            executeCommand(argv[i]);
+        } else {
+            // Parent process
+            if (prev_fd != -1) {
+                close(prev_fd);
+            }
+
+            if (i < argc - 1) {
+                close(pipe_fds[1]); // Close the write end of the pipe
+                prev_fd = pipe_fds[0]; // Set up for the next command
+            }
+
+            int status;
+            waitpid(pid, &status, 0);
+            if (!WIFEXITED(status) || WEXITSTATUS(status) != 0) {
+                exit(EXIT_FAILURE); // Exit if a child process fails
+            }
         }
     }
 
-    close_pipes(pipefds, 2 * num_pipes);
-    while (wait(NULL) > 0);
     return 0;
 }
