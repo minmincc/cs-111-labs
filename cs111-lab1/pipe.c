@@ -1,63 +1,94 @@
 #include <errno.h>
+#include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <unistd.h>
 #include <sys/wait.h>
+#include <unistd.h>
 
-int main(int argc, char *argv[]) {
-    if (argc < 2) {
-        // If no command is passed, exit with EINVAL
-        fprintf(stderr, "Usage: %s <command> [<command> ...]\n", argv[0]);
-        return EINVAL;
-    }
+int main(int argc, char *argv[])
+{
+	if (argc <= 1) {
+		// Invalid argument (less than one)
+		exit(EINVAL);
+	}
+	if (argc == 2) {
+		// Execute directly if only one argument
+		pid_t cpid = fork();
+		if (cpid < 0) {
+			perror("Fork failed");
+			exit(EXIT_FAILURE);
+		}
+		if (cpid == 0) {
+			if (execlp(argv[1], argv[1], NULL) < 0) {
+				perror("Executing command failed");
+        		exit(EXIT_FAILURE);
+			}
+		}
+		else {
+			int status = 0;
+			waitpid(cpid, &status, 0);
+			exit(WEXITSTATUS(status));
+		}
+	}
+	else {
+		// More than two arguments
+		int fds[2];
+		int prevEnd = -1;
 
-    int pipefds[2 * (argc - 2)]; // Array to hold the file descriptors for pipes
-    int pid;
-    int i;
+		for (int i = 1; i < argc; i++) {
 
-    // Create pipes
-    for (i = 0; i < (argc - 2); i++) {
-        if (pipe(pipefds + i * 2) < 0) {
-            perror("pipe");
-            exit(EXIT_FAILURE);
-        }
-    }
+			if (pipe(fds) < 0) {
+				perror("Pipe creation failed");
+				exit(EXIT_FAILURE);
+			}
 
-    // Execute each command
-    for (i = 0; i < argc - 1; i++) {
-        pid = fork();
-        if (pid < 0) {
-            perror("fork");
-            exit(EXIT_FAILURE);
-        }
+			int pid = fork();
+			if (pid < 0) {
+				perror("Fork failed");
+				exit(EXIT_FAILURE);
+			} 
+			else if (pid == 0) {
+				// Child process
+				if (prevEnd != -1) {
+					// Redirect stdin to the read end of previous pipe
+					dup2(prevEnd, STDIN_FILENO);
+					close(prevEnd);
+				}
 
-        if (pid == 0) { // Child process
-            if (i > 0) {
-                dup2(pipefds[(i - 1) * 2], 0); // Set up read end of pipe
-            }
+				// If not the last command
+				if (i < argc - 1) {
+					// Redirect stdout to write end of current pipe
+					dup2(fds[1], STDOUT_FILENO);
+				}
 
-            if (i < argc - 2) {
-                dup2(pipefds[i * 2 + 1], 1); // Set up write end of pipe
-            }
+				close(fds[0]);
+				close(fds[1]);
 
-            // Close all pipe file descriptors
-            for (int j = 0; j < 2 * (argc - 2); j++) {
-                close(pipefds[j]);
-            }
+				// Execute the current command
+				execlp(argv[i], argv[i], NULL);
+				exit(EXIT_FAILURE);
+			} 
+			else {
+				// Parent process
+				close(fds[1]);
+				prevEnd = fds[0];
 
-            execlp(argv[i + 1], argv[i + 1], NULL);
-            perror("execlp");
-            exit(EXIT_FAILURE);
-        }
-    }
+				// Wait for child process
+				int status = 0;
+				waitpid(pid, &status, 0);
 
-    // Close all pipe file descriptors in parent
-    for (i = 0; i < 2 * (argc - 2); i++) {
-        close(pipefds[i]);
-    }
+				if (!WIFEXITED(status)) {
+					// Child process terminate failed
+					exit(EXIT_FAILURE);
+				}
 
-    // Wait for all child processes
-    while ((pid = wait(NULL)) != -1);
-
-    return 0;
+				int exitStatus = WEXITSTATUS(status);
+				if (exitStatus != 0) {
+					// Child process returned an error
+					exit(exitStatus);
+				}
+			}
+		}
+	}
+	return 0;
 }
