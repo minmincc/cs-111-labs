@@ -165,67 +165,70 @@ int main(int argc, char *argv[])
 
   /* Your code here */
 
-u32 cur_time = 0;
-u32 processes_left = size;
+  u32 cur_time = 0;
+  u32 processes_remaining = size; // Rename for clarity
 
-// Initialize processes and enqueue those arriving at time 0
-for (u32 i = 0; i < size; ++i) {
-    data[i].remaining_time = data[i].burst_time;
-    data[i].started = false; // Explicitly initializing 'started' flag
-    if (data[i].arrival_time == 0) {
-        TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-    }
-}
+  // Initialize processes and insert initial arrivals
+  for (u32 i = 0; i < size; i++) {
+      data[i].remaining_time = data[i].burst_time;
+      data[i].started = false;
+      if (data[i].arrival_time == 0) {
+          TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+      }
+  }
 
-// Main scheduling loop
-while (processes_left > 0) {
-    // Enqueue arriving processes
-    for (u32 i = 0; i < size; ++i) {
-        if (data[i].arrival_time == cur_time && !data[i].started) {
-            TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-        }
-    }
+  while (processes_remaining > 0) {
+      bool added_new_processes = false;
 
-    if (!TAILQ_EMPTY(&list)) {
-        struct process *current_process = TAILQ_FIRST(&list);
-        
-        // Start process if it hasn't started
-        if (!current_process->started) {
-            current_process->started = true;
-            current_process->start_time = cur_time;
-            current_process->response_time = cur_time - current_process->arrival_time;
-        }
+      // Enqueue arriving processes and check if any new process is added to the queue
+      for (u32 i = 0; i < size; i++) {
+          if (data[i].arrival_time == cur_time && !data[i].started) {
+              TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+              added_new_processes = true;
+          }
+      }
 
-        // Determine time slice for current process
-        u32 time_slice = (current_process->remaining_time < quantum_length) ? current_process->remaining_time : quantum_length;
+      if (!TAILQ_EMPTY(&list)) {
+          struct process *cur_proc = TAILQ_FIRST(&list);
 
-        // Advance time and decrement remaining time
-        cur_time += time_slice;
-        current_process->remaining_time -= time_slice;
+          // Initialize the process if it's the first time it's being processed
+          if (!cur_proc->started) {
+              cur_proc->started = true;
+              cur_proc->response_time = cur_time - cur_proc->arrival_time;
+          }
 
-        // Enqueue processes arriving during execution
-        for (u32 i = 0; i < size; ++i) {
-            if (data[i].arrival_time > current_process->start_time && data[i].arrival_time <= cur_time && !data[i].started) {
-                TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-            }
-        }
+          // Determine the time slice used by the current process
+          u32 time_slice = (cur_proc->remaining_time < quantum_length) ? cur_proc->remaining_time : quantum_length;
+          cur_proc->remaining_time -= time_slice;
+          cur_time += time_slice;
 
-        // Finalize or requeue process
-        if (current_process->remaining_time == 0) {
-            current_process->waiting_time = cur_time - current_process->arrival_time - current_process->burst_time;
-            total_waiting_time += current_process->waiting_time;
-            total_response_time += current_process->response_time;
-            --processes_left;
-            TAILQ_REMOVE(&list, current_process, pointers);
-        } else {
-            TAILQ_REMOVE(&list, current_process, pointers);
-            TAILQ_INSERT_TAIL(&list, current_process, pointers);
-        }
-    } else {
-        // No processes in the queue, advance time
-        ++cur_time;
-    }
-}
+          // Enqueue processes arriving during the execution of the current time slice
+          for (u32 time_passed = 0; time_passed < time_slice; ++time_passed) {
+              for (u32 i = 0; i < size; i++) {
+                  if (data[i].arrival_time == cur_time - time_slice + time_passed + 1 && !data[i].started) {
+                      TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+                      added_new_processes = true;
+                  }
+              }
+          }
+
+          // Process completion check
+          if (cur_proc->remaining_time == 0) {
+              cur_proc->waiting_time = cur_time - cur_proc->arrival_time - cur_proc->burst_time;
+              total_waiting_time += cur_proc->waiting_time;
+              total_response_time += cur_proc->response_time;
+              processes_remaining--;
+              TAILQ_REMOVE(&list, cur_proc, pointers);
+          } else {
+              // Move the process to the end of the queue if it's not completed
+              TAILQ_REMOVE(&list, cur_proc, pointers);
+              TAILQ_INSERT_TAIL(&list, cur_proc, pointers);
+          }
+      } else if (!added_new_processes) {
+          // Increment current time if no process was added and the list is empty
+          cur_time++;
+      }
+  }
   /* End of "Your code here" */
 
   printf("Average waiting time: %.2f\n", (float)total_waiting_time / (float)size);
