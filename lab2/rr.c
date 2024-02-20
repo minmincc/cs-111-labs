@@ -165,63 +165,66 @@ int main(int argc, char *argv[])
 
   /* Your code here */
 
-  u32 cur_time = 0;
-  u32 remaining_proc = size;
-  
-  for (u32 i = 0; i < size; i++) {
+  u32 current_time = 0;
+  u32 processes_left = size;
+
+  // Initialize process states and enqueue processes that arrive at time 0
+  for (u32 i = 0; i < size; ++i) {
       data[i].remaining_time = data[i].burst_time;
+      data[i].waiting_time = 0;
       data[i].started = false;
       if (data[i].arrival_time == 0) {
           TAILQ_INSERT_TAIL(&list, &data[i], pointers);
       }
   }
-  
-  while (remaining_proc > 0) {
-      while (TAILQ_EMPTY(&list)) {
-          cur_time++;
-          
-          // Add processes to the queue
-          for (u32 i = 0; i < size; i++) {
-              if (data[i].arrival_time == cur_time) {
-                  TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-              }
+
+  // Main scheduling loop
+  while (processes_left > 0) {
+      // Check for and enqueue any arriving processes at the current time
+      for (u32 i = 0; i < size; ++i) {
+          if (data[i].arrival_time == current_time && !data[i].started) {
+              TAILQ_INSERT_TAIL(&list, &data[i], pointers);
           }
       }
-      
-      struct process *cur_proc = TAILQ_FIRST(&list);
-      
-      if (!cur_proc->started) {
-          cur_proc->started = true;
-          cur_proc->start_time = cur_time;
-          cur_proc->response_time = cur_time - cur_proc->arrival_time;
-      }
-      
-      u32 time_used = quantum_length;
-      if (time_used > cur_proc->remaining_time) {
-          time_used = cur_proc->remaining_time;
-      }
-      
-      while (time_used > 0) {
-          cur_time++;
-          cur_proc->remaining_time--;
-          time_used--;
+
+      if (!TAILQ_EMPTY(&list)) {
+          struct process *current_process = TAILQ_FIRST(&list);
           
-          for (u32 i = 0; i < size; i++) {
-              if (data[i].arrival_time == cur_time) {
-                  TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+          // Calculate execution time for the current process
+          u32 execution_time = (current_process->remaining_time < quantum_length) ? current_process->remaining_time : quantum_length;
+
+          // Update process start time and response time if first execution
+          if (!current_process->started) {
+              current_process->started = true;
+              current_process->response_time = current_time - current_process->arrival_time;
+          }
+
+          // Execute the process for either its remaining time or the quantum length
+          current_process->remaining_time -= execution_time;
+          current_time += execution_time;
+
+          // Update waiting times for other processes in the queue
+          struct process *temp;
+          TAILQ_FOREACH(temp, &list, pointers) {
+              if (temp != current_process) {
+                  temp->waiting_time += execution_time;
               }
           }
-      }
-      
-      if (cur_proc->remaining_time == 0) {
-          cur_proc->waiting_time = cur_time - cur_proc->arrival_time - cur_proc->burst_time;
-          total_waiting_time += cur_proc->waiting_time;
-          total_response_time += cur_proc->response_time;
-          remaining_proc--;
-          TAILQ_REMOVE(&list, cur_proc, pointers);
+
+          // Process completion check
+          if (current_process->remaining_time == 0) {
+              total_waiting_time += current_process->waiting_time;
+              total_response_time += current_process->response_time;
+              processes_left--;
+              TAILQ_REMOVE(&list, current_process, pointers);
+          } else {
+              // Move the current process to the end of the list for round-robin scheduling
+              TAILQ_REMOVE(&list, current_process, pointers);
+              TAILQ_INSERT_TAIL(&list, current_process, pointers);
+          }
       } else {
-          TAILQ_REMOVE(&list, cur_proc, pointers);
-          TAILQ_INSERT_TAIL(&list, cur_proc, pointers);
+          // Advance time if no processes are ready to execute
+          current_time++;
       }
   }
   /* End of "Your code here" */
