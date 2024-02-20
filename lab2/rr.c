@@ -165,70 +165,70 @@ int main(int argc, char *argv[])
 
   /* Your code here */
 
-  u32 cur_time = 0;
-  u32 remaining_proc = size;
+u32 cur_time = 0;
+u32 remaining_proc = size;
 
+// Initialize processes and enqueue those arriving at time 0
+for (u32 i = 0; i < size; i++) {
+  data[i].remaining_time = data[i].burst_time;
+  data[i].started = false;
+  if (data[i].arrival_time == 0) {
+    TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+  }
+}
+
+// Main scheduling loop
+while (remaining_proc > 0) {
+  // Enqueue processes arriving at the current time
   for (u32 i = 0; i < size; i++) {
-    data[i].remaining_time = data[i].burst_time;
-    // data[i].waiting_time = 0;
-    data[i].started = false;
-    if (data[i].arrival_time == 0) {
+    if (data[i].arrival_time == cur_time && !data[i].started) {
       TAILQ_INSERT_TAIL(&list, &data[i], pointers);
     }
   }
-  
-  while (remaining_proc > 0) {
-    while (TAILQ_EMPTY(&list)) {
-      cur_time++;
 
-      // Add processes to the queue
-      for (u32 i = 0; i < size; i++) {
-        if (data[i].arrival_time == cur_time) {
-          TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-        }
-      }
-    }
-    
+  if (!TAILQ_EMPTY(&list)) {
     struct process *cur_proc = TAILQ_FIRST(&list);
-  
-    // if not started before
-    if (cur_proc->started == false) {
+
+    // Initialize process if not already started
+    if (!cur_proc->started) {
       cur_proc->started = true;
       cur_proc->start_time = cur_time;
       cur_proc->response_time = cur_time - cur_proc->arrival_time;
     }
 
-    u32 time_used = quantum_length;
-    if (time_used > cur_proc->remaining_time) {
-      time_used = cur_proc->remaining_time;
-    }
+    // Calculate the time slice for the current process
+    u32 time_slice = quantum_length < cur_proc->remaining_time ? quantum_length : cur_proc->remaining_time;
 
-    while (time_used > 0) {
-      cur_time++;
-      cur_proc->remaining_time--;
-      time_used--;
-      
+    // Execute the process for the time slice
+    cur_proc->remaining_time -= time_slice;
+    cur_time += time_slice;
+
+    // Check if any process arrives during the execution of the current process
+    for (u32 j = 0; j < time_slice; j++) {
       for (u32 i = 0; i < size; i++) {
-        if (data[i].arrival_time == cur_time) {
+        if (data[i].arrival_time == cur_time - time_slice + j + 1 && !data[i].started) {
           TAILQ_INSERT_TAIL(&list, &data[i], pointers);
         }
       }
     }
 
-    // process completed
+    // Process completion
     if (cur_proc->remaining_time == 0) {
-      cur_proc->waiting_time = cur_time - cur_proc->arrival_time - cur_proc->burst_time;
+      cur_proc->waiting_time = cur_proc->start_time - cur_proc->arrival_time;
       total_waiting_time += cur_proc->waiting_time;
       total_response_time += cur_proc->response_time;
       remaining_proc--;
       TAILQ_REMOVE(&list, cur_proc, pointers);
-    } 
-    // process not completed
-    else {
+    } else {
+      // Requeue the process if it's not finished
       TAILQ_REMOVE(&list, cur_proc, pointers);
       TAILQ_INSERT_TAIL(&list, cur_proc, pointers);
     }
+  } else {
+    // Advance time if no processes are ready to run
+    cur_time++;
   }
+}
   /* End of "Your code here" */
 
   printf("Average waiting time: %.2f\n", (float)total_waiting_time / (float)size);
