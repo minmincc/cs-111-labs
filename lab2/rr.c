@@ -166,58 +166,60 @@ int main(int argc, char *argv[])
   /* Your code here */
 
   u32 cur_time = 0;
-  u32 processes_in_queue = 0;
+  u32 processed = 0;
 
-  // Initialize processes and insert the ones that arrive at time 0 into the queue
-  for (u32 i = 0; i < size; i++) {
+  // Initialize processes and insert them into the queue if they arrive at time 0
+  for (u32 i = 0; i < size; ++i) {
       data[i].remaining_time = data[i].burst_time;
       data[i].started = false;
       if (data[i].arrival_time == 0) {
           TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-          processes_in_queue++;
       }
   }
 
   // Main scheduling loop
-  while (processes_in_queue > 0) {
-      // Check for new arrivals at the current time and add them to the queue
-      for (u32 i = 0; i < size; i++) {
-          if (data[i].arrival_time == cur_time && !data[i].started) {
+  while (processed < size) {
+      // Check for and enqueue new arrivals
+      for (u32 i = 0; i < size; ++i) {
+          if (data[i].arrival_time == cur_time) {
               TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-              processes_in_queue++;
           }
       }
       
       if (!TAILQ_EMPTY(&list)) {
           struct process *cur_proc = TAILQ_FIRST(&list);
+          
+          // Process initialization
           if (!cur_proc->started) {
               cur_proc->started = true;
               cur_proc->response_time = cur_time - cur_proc->arrival_time;
           }
           
-          // Calculate the time slice used by the current process
+          // Calculate the actual time slice used
           u32 time_slice = (cur_proc->remaining_time < quantum_length) ? cur_proc->remaining_time : quantum_length;
           cur_proc->remaining_time -= time_slice;
           cur_time += time_slice;
-
-          // Update waiting times for all processes in the queue
+          
+          // Update waiting times for others in the queue
           struct process *tmp;
           TAILQ_FOREACH(tmp, &list, pointers) {
-              if (tmp != cur_proc) tmp->waiting_time += time_slice;
+              if (tmp != cur_proc) {
+                  tmp->waiting_time += time_slice;
+              }
           }
-
+          
           if (cur_proc->remaining_time == 0) {
               total_waiting_time += cur_proc->waiting_time;
               total_response_time += cur_proc->response_time;
               TAILQ_REMOVE(&list, cur_proc, pointers);
-              processes_in_queue--;
+              processed++;
           } else {
               // Move the current process to the end of the queue
               TAILQ_REMOVE(&list, cur_proc, pointers);
               TAILQ_INSERT_TAIL(&list, cur_proc, pointers);
           }
       } else {
-          // No process in the queue, advance time
+          // Increment time if no process is ready to run
           cur_time++;
       }
   }
