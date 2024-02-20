@@ -165,67 +165,71 @@ int main(int argc, char *argv[])
 
   /* Your code here */
 
-  u32 cur_time = 0;
-  bool any_process_arrived = false;
+  u32 current_time = 0;
+  u32 processes_left = size;
 
-  // Initialize processes' states
-  for (u32 i = 0; i < size; i++) {
+  // Initialize processes
+  for (u32 i = 0; i < size; ++i) {
       data[i].remaining_time = data[i].burst_time;
       data[i].started = false;
+      // Immediately add processes that arrive at time 0
       if (data[i].arrival_time == 0) {
           TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-          any_process_arrived = true;
       }
   }
 
-  // Main loop to simulate the round-robin scheduling
-  while (size > 0) {
-      // Check if any process is ready to be scheduled at the current time
-      if (!any_process_arrived) {
-          cur_time++;
-          for (u32 i = 0; i < size; i++) {
-              if (data[i].arrival_time == cur_time) {
-                  TAILQ_INSERT_TAIL(&list, &data[i], pointers);
-                  any_process_arrived = true;
-              }
-          }
-      }
-
-      // Schedule the process if the list is not empty
-      if (any_process_arrived) {
-          struct process *cur_proc = TAILQ_FIRST(&list);
-          if (!cur_proc->started) {
-              cur_proc->started = true;
-              cur_proc->response_time = cur_time - cur_proc->arrival_time;
-          }
-
-          u32 time_slice = min(quantum_length, cur_proc->remaining_time);
-          cur_time += time_slice;
-          cur_proc->remaining_time -= time_slice;
-
-          // Update arrival of new processes during the execution of the current process
-          for (u32 time_passed = 0; time_passed < time_slice; time_passed++) {
-              for (u32 i = 0; i < size; i++) {
-                  if (data[i].arrival_time == cur_time - time_slice + time_passed + 1) {
+  // Main scheduling loop
+  while (processes_left > 0) {
+      // Check for process arrivals if the list is empty
+      if (TAILQ_EMPTY(&list)) {
+          do {
+              bool process_added = false;
+              for (u32 i = 0; i < size; ++i) {
+                  if (data[i].arrival_time == current_time) {
                       TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+                      process_added = true;
                   }
               }
+              // Increment time if no process was added and list is still empty
+              if (!process_added) {
+                  current_time++;
+              }
+          } while (TAILQ_EMPTY(&list));
+      }
+      
+      struct process *current_process = TAILQ_FIRST(&list);
+      
+      // Start process if not already started
+      if (!current_process->started) {
+          current_process->started = true;
+          current_process->start_time = current_time;
+          current_process->response_time = current_time - current_process->arrival_time;
+      }
+      
+      // Calculate time slice for the current process
+      u32 time_slice = quantum_length < current_process->remaining_time ? quantum_length : current_process->remaining_time;
+      current_time += time_slice;
+      current_process->remaining_time -= time_slice;
+      
+      // Add arriving processes during the execution of the current time slice
+      for (u32 i = 0; i < size; ++i) {
+          if (data[i].arrival_time > current_process->start_time && data[i].arrival_time <= current_time) {
+              TAILQ_INSERT_TAIL(&list, &data[i], pointers);
           }
-
-          // Process completion check
-          if (cur_proc->remaining_time == 0) {
-              cur_proc->waiting_time = cur_time - cur_proc->arrival_time - cur_proc->burst_time;
-              total_waiting_time += cur_proc->waiting_time;
-              total_response_time += cur_proc->response_time;
-              size--;
-              TAILQ_REMOVE(&list, cur_proc, pointers);
-          } else {
-              // Requeue the process for the next round
-              TAILQ_REMOVE(&list, cur_proc, pointers);
-              TAILQ_INSERT_TAIL(&list, cur_proc, pointers);
-          }
-
-          any_process_arrived = !TAILQ_EMPTY(&list);
+      }
+      
+      // Process completed
+      if (current_process->remaining_time == 0) {
+          current_process->waiting_time = current_time - current_process->arrival_time - current_process->burst_time;
+          total_waiting_time += current_process->waiting_time;
+          total_response_time += current_process->response_time;
+          processes_left--;
+          TAILQ_REMOVE(&list, current_process, pointers);
+      }
+      // Requeue the process if not completed
+      else {
+          TAILQ_REMOVE(&list, current_process, pointers);
+          TAILQ_INSERT_TAIL(&list, current_process, pointers);
       }
   }
   /* End of "Your code here" */
