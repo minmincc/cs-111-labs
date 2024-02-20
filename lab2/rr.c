@@ -19,7 +19,11 @@ struct process
   u32 burst_time;
 
   TAILQ_ENTRY(process) pointers;
-
+  u32 remaining_time;   // Time left for the process to complete
+  u32 waiting_time;     // Total time spent by process waiting in queue
+  u32 response_time;    // Time from arriving to first getting the CPU
+  u32 start_time;       // Time when the process starts its execution
+  bool started;   
   /* Additional fields here */
   /* End of "Additional fields here" */
 };
@@ -160,7 +164,72 @@ int main(int argc, char *argv[])
   u32 total_response_time = 0;
 
   /* Your code here */
+  u32 current_time = 0;
+  bool all_processes_started = false;
   
+  // Insert processes into the queue based on their arrival time
+  for (u32 i = 0; i < size; ++i)
+  {
+      if (data[i].arrival_time == current_time)
+      {
+          TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+      }
+  }
+  
+  while (!all_processes_started || !TAILQ_EMPTY(&list))
+  {
+      struct process *current_process = TAILQ_FIRST(&list);
+      if (current_process != NULL)
+      {
+          if (!current_process->started)
+          {
+              current_process->started = true;
+              current_process->start_time = current_time;
+              current_process->response_time = current_time - current_process->arrival_time;
+          }
+          
+          u32 execution_time = (current_process->remaining_time < quantum_length) ? current_process->remaining_time : quantum_length;
+          current_process->remaining_time -= execution_time;
+          current_time += execution_time;
+          
+          if (current_process->remaining_time == 0)
+          {
+              current_process->waiting_time = current_time - current_process->arrival_time - current_process->burst_time;
+              total_waiting_time += current_process->waiting_time;
+              total_response_time += current_process->response_time;
+              TAILQ_REMOVE(&list, current_process, pointers);
+          }
+          else
+          {
+              TAILQ_REMOVE(&list, current_process, pointers);
+              TAILQ_INSERT_TAIL(&list, current_process, pointers);
+          }
+      }
+      else
+      {
+          current_time++;
+      }
+      
+      // Check for any new arrivals at the current time
+      for (u32 i = 0; i < size; ++i)
+      {
+          if (data[i].arrival_time == current_time)
+          {
+              TAILQ_INSERT_TAIL(&list, &data[i], pointers);
+          }
+      }
+      
+      all_processes_started = true;
+      for (u32 i = 0; i < size; ++i)
+      {
+          if (!data[i].started && data[i].arrival_time > current_time)
+          {
+              all_processes_started = false;
+              break;
+          }
+      }
+  }
+    
   /* End of "Your code here" */
 
   printf("Average waiting time: %.2f\n", (float)total_waiting_time / (float)size);
