@@ -103,16 +103,21 @@ uint32_t hash_table_v2_get_value(struct hash_table_v2 *hash_table,
 
 void hash_table_v2_destroy(struct hash_table_v2 *hash_table)
 {
-	for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
-		struct hash_table_entry *entry = &hash_table->entries[i];
-		
-		struct list_head *list_head = &entry->list_head;
-		struct list_entry *list_entry = NULL;
-		while (!SLIST_EMPTY(list_head)) {
-			list_entry = SLIST_FIRST(list_head);
-			SLIST_REMOVE_HEAD(list_head, pointers);
-			free(list_entry);
-		}
-	}
-	free(hash_table);
+    for (size_t i = 0; i < HASH_TABLE_CAPACITY; ++i) {
+        struct hash_table_entry *entry = &hash_table->entries[i];
+
+        // Destroy the mutex associated with the entry
+        pthread_mutex_destroy(&entry->mutex);
+
+        struct list_head *list_head = &entry->list_head;
+        struct list_entry *list_entry = NULL;
+        while (!SLIST_EMPTY(list_head)) {
+            list_entry = SLIST_FIRST(list_head);
+            SLIST_REMOVE_HEAD(list_head, pointers);
+            free(list_entry);
+        }
+    }
+
+    // Now that all mutexes are destroyed, free the hash table
+    free(hash_table);
 }
