@@ -74,21 +74,35 @@ void hash_table_v2_add_entry(struct hash_table_v2 *hash_table,
                              const char *key,
                              uint32_t value)
 {
-	struct hash_table_entry *hash_table_entry = get_hash_table_entry(hash_table, key);
-	pthread_mutex_lock(&hash_table_entry->mutex);
-	struct list_head *list_head = &hash_table_entry->list_head;
-	struct list_entry *list_entry = get_list_entry(hash_table, key, list_head);
+    struct hash_table_entry *hash_table_entry = get_hash_table_entry(hash_table, key);
+    struct list_head *list_head = &hash_table_entry->list_head;
 
-	/* Update the value if it already exists */
-    if (list_entry != NULL) {
-        list_entry->value = value;
+    // Attempt to find the list entry outside of the lock to reduce the time spent in the critical section
+    struct list_entry *list_entry = get_list_entry(hash_table, key, list_head);
+
+    // Lock only if we need to modify the list
+    if (list_entry == NULL) {
+        // Allocate memory for the new list entry outside of the critical section
+        struct list_entry *new_entry = calloc(1, sizeof(struct list_entry));
+        new_entry->key = key;
+        new_entry->value = value;
+
+        pthread_mutex_lock(&hash_table_entry->mutex);
+        // Check again to see if the entry was added while we were allocating the new_entry
+        list_entry = get_list_entry(hash_table, key, list_head);
+        if (list_entry == NULL) {
+            // If not, insert the new entry
+            SLIST_INSERT_HEAD(list_head, new_entry, pointers);
+        } else {
+            // If an entry was added, update the value and free the new entry
+            list_entry->value = value;
+            free(new_entry);
+        }
+        pthread_mutex_unlock(&hash_table_entry->mutex);
     } else {
-        list_entry = calloc(1, sizeof(struct list_entry));
-        list_entry->key = key;
+        // If the entry exists, just update the value without locking
         list_entry->value = value;
-        SLIST_INSERT_HEAD(list_head, list_entry, pointers);
     }
-    pthread_mutex_unlock(&hash_table_entry->mutex); 
 }
 
 uint32_t hash_table_v2_get_value(struct hash_table_v2 *hash_table,
