@@ -72,15 +72,16 @@ This method is valid as it secures the essential section of each entry. By locki
 TODO how to run and results
 ```
 TODO more results, speedup measurement, and analysis on v2
+
 Answer:
 example:  ./hash-table-tester -t 4 -s 50000
 Generation: 35,259 usec
 Hash table base: 219,806 usec
-  - 0 missing
+- 0 missing
 Hash table v1: 390,257 usec
-  - 0 missing
+- 0 missing
 Hash table v2: 71,679 usec
-  - 0 missing
+- 0 missing
 
 Using the command ./hash-table-tester -t 4 -s 50000, the v2 implementation demonstrated a significant performance improvement over the base version, completing in 71,679 microseconds compared to the base's 219,806 microseconds. This results in a speedup of approximately 3 times faster with the machine's 4 physical cores fully utilized.
 
