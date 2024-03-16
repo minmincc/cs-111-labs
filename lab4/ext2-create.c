@@ -358,16 +358,16 @@ void write_inode_table(int fd) {
 
 	// TODO It's all yours
 	// TODO finish the inode entries for the other files
-	struct ext2_inode root_dir_inode = {0};
+    struct ext2_inode root_dir_inode = {0};
     root_dir_inode.i_mode = EXT2_S_IFDIR | EXT2_S_IRUSR | EXT2_S_IWUSR | EXT2_S_IXUSR |
                             EXT2_S_IRGRP | EXT2_S_IXGRP | EXT2_S_IROTH | EXT2_S_IXOTH;
     root_dir_inode.i_uid = 0;
-    root_dir_inode.i_size = BLOCK_SIZE; // Assuming one block size for the directory
+    root_dir_inode.i_size = BLOCK_SIZE;
     root_dir_inode.i_atime = root_dir_inode.i_ctime = root_dir_inode.i_mtime = current_time;
     root_dir_inode.i_dtime = 0;
     root_dir_inode.i_gid = 0;
-    root_dir_inode.i_links_count = 2; // '.' and '..' entries count as links
-    root_dir_inode.i_blocks = 2; // 512 bytes per block in ext2, so 2 for 1K block
+    root_dir_inode.i_links_count = 2; // '.' and '..'
+    root_dir_inode.i_blocks = 2; // Since 1 block = 2 * 512 bytes
     root_dir_inode.i_block[0] = ROOT_DIR_BLOCKNO;
     write_inode(fd, EXT2_ROOT_INO, &root_dir_inode);
 
@@ -403,7 +403,7 @@ void write_inode_table(int fd) {
 void write_root_dir_block(int fd)
 {
 	// TODO It's all yours
-	off_t off = lseek(fd, BLOCK_OFFSET(ROOT_DIR_BLOCKNO), SEEK_SET);
+    off_t off = lseek(fd, BLOCK_OFFSET(ROOT_DIR_BLOCKNO), SEEK_SET);
     if (off == -1) {
         errno_exit("lseek");
     }
@@ -436,7 +436,7 @@ void write_root_dir_block(int fd)
     dir_entry_write(dir_entry, fd);
     bytes_remaining -= dir_entry.rec_len;
 
-    // Fill the rest of the block with zeros if any space left
+    // Ensure the directory block is fully utilized
     if (bytes_remaining > 0) {
         char zero_buf[bytes_remaining];
         memset(zero_buf, 0, sizeof(zero_buf));
