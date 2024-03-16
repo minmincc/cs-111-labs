@@ -288,7 +288,7 @@ void write_block_bitmap(int fd)
         map_value[i / 8] |= (1 << (i % 8));
     }
 
-    
+    // Correcting the rest of the blocks as free
     for (int i = LAST_BLOCK + 1; i < NUM_BLOCKS; i++) {
         map_value[i / 8] &= ~(1 << (i % 8));
     }
@@ -369,7 +369,7 @@ void write_inode_table(int fd) {
                             | EXT2_S_IXOTH;
     root_dir_inode.i_uid = 0;
     root_dir_inode.i_gid = 0;
-    root_dir_inode.i_size = 1024; 
+    root_dir_inode.i_size = 1024; // Assuming 1024 bytes for the directory size
     root_dir_inode.i_atime = current_time;
     root_dir_inode.i_ctime = current_time;
     root_dir_inode.i_mtime = current_time;
@@ -386,14 +386,14 @@ void write_inode_table(int fd) {
                                | EXT2_S_IWUSR
                                | EXT2_S_IRGRP
                                | EXT2_S_IROTH;
-    hello_world_inode.i_uid = 1000; 
-    hello_world_inode.i_gid = 1000; 
+    hello_world_inode.i_uid = 1000; // Assuming UID 1000 for the file owner
+    hello_world_inode.i_gid = 1000; // Assuming GID 1000 for the file group
     hello_world_inode.i_size = 12; // "Hello world\n"
     hello_world_inode.i_atime = current_time;
     hello_world_inode.i_ctime = current_time;
     hello_world_inode.i_mtime = current_time;
     hello_world_inode.i_dtime = 0;
-    hello_world_inode.i_links_count = 1; 
+    hello_world_inode.i_links_count = 1; // Just one link to this file
     hello_world_inode.i_blocks = 2; // 2 blocks (1024 bytes each)
     hello_world_inode.i_block[0] = HELLO_WORLD_FILE_BLOCKNO;
     write_inode(fd, HELLO_WORLD_INO, &hello_world_inode);
@@ -405,14 +405,14 @@ void write_inode_table(int fd) {
                          | EXT2_S_IWUSR
                          | EXT2_S_IRGRP
                          | EXT2_S_IROTH;
-    hello_inode.i_uid = 1000; 
-    hello_inode.i_gid = 1000; 
+    hello_inode.i_uid = 1000; // Assuming UID 1000 for the symlink owner
+    hello_inode.i_gid = 1000; // Assuming GID 1000 for the symlink group
     hello_inode.i_size = 11; // "hello-world"
     hello_inode.i_atime = current_time;
     hello_inode.i_ctime = current_time;
     hello_inode.i_mtime = current_time;
     hello_inode.i_dtime = 0;
-    hello_inode.i_links_count = 1; 
+    hello_inode.i_links_count = 1; // Just one link to this symlink
     hello_inode.i_blocks = 0; // Symlinks less than 60 bytes store the path in the inode itself
     memcpy(hello_inode.i_block, "hello-world", 11); // Store the symlink target directly in the i_block array
     write_inode(fd, HELLO_INO, &hello_inode);
