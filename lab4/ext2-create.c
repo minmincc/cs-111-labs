@@ -373,7 +373,7 @@ void write_inode_table(int fd) {
     write_inode(fd, EXT2_ROOT_INO, &root_dir_inode);
 
     // Lost and Found Directory Inode
-    struct ext2_inode lost_and_found_inode = root_dir_inode; // Base on root inode and adjust
+    lost_and_found_inode = root_dir_inode; // Base on root inode and adjust
     lost_and_found_inode.i_block[0] = LOST_AND_FOUND_DIR_BLOCKNO;
     lost_and_found_inode.i_links_count = 2; // Adjust if necessary
     write_inode(fd, LOST_AND_FOUND_INO, &lost_and_found_inode);
