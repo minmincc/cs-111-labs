@@ -359,51 +359,62 @@ void write_inode_table(int fd) {
 	// TODO It's all yours
 	// TODO finish the inode entries for the other files
     struct ext2_inode root_dir_inode = {0};
-    root_dir_inode.i_mode = EXT2_S_IFDIR | EXT2_S_IRUSR | EXT2_S_IWUSR | EXT2_S_IXUSR |
-                            EXT2_S_IRGRP | EXT2_S_IXGRP | EXT2_S_IROTH | EXT2_S_IXOTH;
+    root_dir_inode.i_mode = EXT2_S_IFDIR
+                            | EXT2_S_IRUSR
+                            | EXT2_S_IWUSR
+                            | EXT2_S_IXUSR
+                            | EXT2_S_IRGRP
+                            | EXT2_S_IXGRP
+                            | EXT2_S_IROTH
+                            | EXT2_S_IXOTH;
     root_dir_inode.i_uid = 0;
     root_dir_inode.i_gid = 0;
-    root_dir_inode.i_size = BLOCK_SIZE;
+    root_dir_inode.i_size = 1024; // Assuming 1024 bytes for the directory size
     root_dir_inode.i_atime = current_time;
     root_dir_inode.i_ctime = current_time;
     root_dir_inode.i_mtime = current_time;
-    root_dir_inode.i_blocks = 2;
-    root_dir_inode.i_links_count = 2;
+    root_dir_inode.i_dtime = 0;
+    root_dir_inode.i_links_count = 3; // '.' and '..' plus 'lost+found'
+    root_dir_inode.i_blocks = 2; // 2 blocks (1024 bytes each)
     root_dir_inode.i_block[0] = ROOT_DIR_BLOCKNO;
     write_inode(fd, EXT2_ROOT_INO, &root_dir_inode);
 
-    // Lost and Found Directory Inode
-    lost_and_found_inode = root_dir_inode; // Base on root inode and adjust
-    lost_and_found_inode.i_block[0] = LOST_AND_FOUND_DIR_BLOCKNO;
-    lost_and_found_inode.i_links_count = 2; // Adjust if necessary
-    write_inode(fd, LOST_AND_FOUND_INO, &lost_and_found_inode);
-
     // "hello-world" File Inode
     struct ext2_inode hello_world_inode = {0};
-    hello_world_inode.i_mode = EXT2_S_IFREG | EXT2_S_IRUSR | EXT2_S_IWUSR |
-                               EXT2_S_IRGRP | EXT2_S_IROTH;
-    hello_world_inode.i_uid = 0;
-    hello_world_inode.i_gid = 0;
+    hello_world_inode.i_mode = EXT2_S_IFREG
+                               | EXT2_S_IRUSR
+                               | EXT2_S_IWUSR
+                               | EXT2_S_IRGRP
+                               | EXT2_S_IROTH;
+    hello_world_inode.i_uid = 1000; // Assuming UID 1000 for the file owner
+    hello_world_inode.i_gid = 1000; // Assuming GID 1000 for the file group
     hello_world_inode.i_size = 12; // "Hello world\n"
     hello_world_inode.i_atime = current_time;
     hello_world_inode.i_ctime = current_time;
     hello_world_inode.i_mtime = current_time;
-    hello_world_inode.i_blocks = 2;
+    hello_world_inode.i_dtime = 0;
+    hello_world_inode.i_links_count = 1; // Just one link to this file
+    hello_world_inode.i_blocks = 2; // 2 blocks (1024 bytes each)
     hello_world_inode.i_block[0] = HELLO_WORLD_FILE_BLOCKNO;
     write_inode(fd, HELLO_WORLD_INO, &hello_world_inode);
 
     // "hello" Symlink Inode
     struct ext2_inode hello_inode = {0};
-    hello_inode.i_mode = EXT2_S_IFLNK | EXT2_S_IRUSR | EXT2_S_IWUSR |
-                         EXT2_S_IRGRP | EXT2_S_IROTH;
-    hello_inode.i_uid = 0;
-    hello_inode.i_gid = 0;
-    hello_inode.i_size = 11; // Length of "hello-world"
+    hello_inode.i_mode = EXT2_S_IFLNK
+                         | EXT2_S_IRUSR
+                         | EXT2_S_IWUSR
+                         | EXT2_S_IRGRP
+                         | EXT2_S_IROTH;
+    hello_inode.i_uid = 1000; // Assuming UID 1000 for the symlink owner
+    hello_inode.i_gid = 1000; // Assuming GID 1000 for the symlink group
+    hello_inode.i_size = 11; // "hello-world"
     hello_inode.i_atime = current_time;
     hello_inode.i_ctime = current_time;
     hello_inode.i_mtime = current_time;
-    hello_inode.i_blocks = 0; // Symlinks store path in inode itself if size < 60 bytes
-    memcpy(&(hello_inode.i_block), "hello-world", 11);
+    hello_inode.i_dtime = 0;
+    hello_inode.i_links_count = 1; // Just one link to this symlink
+    hello_inode.i_blocks = 0; // Symlinks less than 60 bytes store the path in the inode itself
+    memcpy(hello_inode.i_block, "hello-world", 11); // Store the symlink target directly in the i_block array
     write_inode(fd, HELLO_INO, &hello_inode);
 	
 }
