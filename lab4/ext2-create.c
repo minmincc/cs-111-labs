@@ -281,15 +281,16 @@ void write_block_bitmap(int fd)
         errno_exit("lseek");
     }
 
-    u8 map_value[BLOCK_SIZE];
-    memset(map_value, 0, BLOCK_SIZE);
+    u8 map_value[BLOCK_SIZE] = {0}; // Initialize all to zero (free)
 
-    // Marking blocks as used up to and including LAST_BLOCK
-    for (int block = 0; block <= LAST_BLOCK; ++block) {
-        map_value[block / 8] |= (1 << (block % 8));
+    // Mark blocks up to LAST_BLOCK as used
+    for (int blockNum = 0; blockNum <= LAST_BLOCK; blockNum++) {
+        int byteIndex = blockNum / 8;
+        int bitIndex = blockNum % 8;
+        map_value[byteIndex] |= (1 << bitIndex);
     }
 
-    // Setting the rest of the blocks in the bitmap as free
+    // Write the modified bitmap to the file
     if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE) {
         errno_exit("write");
     }
@@ -302,15 +303,16 @@ void write_inode_bitmap(int fd)
         errno_exit("lseek");
     }
 
-    u8 map_value[BLOCK_SIZE];
-    memset(map_value, 0, BLOCK_SIZE);
+    u8 map_value[BLOCK_SIZE] = {0}; // Initialize all to zero (free)
 
-    // Marking inodes as used up to and including LAST_INO
-    for (int inode = 1; inode <= LAST_INO; ++inode) { // Starts from 1 because inode numbers start from 1
-        map_value[inode / 8] |= (1 << (inode % 8));
+    // Mark inodes up to LAST_INO as used
+    for (int inodeNum = 0; inodeNum <= LAST_INO; inodeNum++) {
+        int byteIndex = inodeNum / 8;
+        int bitIndex = inodeNum % 8;
+        map_value[byteIndex] |= (1 << bitIndex);
     }
 
-    // Setting the rest of the inodes in the bitmap as free
+    // Write the modified bitmap to the file
     if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE) {
         errno_exit("write");
     }
