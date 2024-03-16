@@ -276,72 +276,48 @@ void write_block_group_descriptor_table(int fd) {
 
 void write_block_bitmap(int fd)
 {
-	off_t off = lseek(fd, BLOCK_OFFSET(BLOCK_BITMAP_BLOCKNO), SEEK_SET);
-	if (off == -1)
-	{
-		errno_exit("lseek");
-	}
+    off_t off = lseek(fd, BLOCK_OFFSET(BLOCK_BITMAP_BLOCKNO), SEEK_SET);
+    if (off == -1) {
+        errno_exit("lseek");
+    }
 
-	// TODO It's all yours
-	u8 map_value[BLOCK_SIZE];
-	memset(map_value, 0, BLOCK_SIZE);
+    u8 map_value[BLOCK_SIZE];
+    memset(map_value, 0, BLOCK_SIZE); // Initialize all bits to 0.
 
-	for (int i = 0; i < BLOCK_SIZE; ++i) {
-		int cur_start = i * 8;
-		int cur_end = (i + 1) * 8;
+    // Mark blocks as used up to LAST_BLOCK by setting the corresponding bits to 1.
+    for (int block = 0; block <= LAST_BLOCK; block++) {
+        int byteIndex = block / 8;
+        int bitIndex = block % 8;
+        map_value[byteIndex] |= (1 << bitIndex);
+    }
 
-		if (cur_end <= LAST_BLOCK) {
-			map_value[i] = 0xFF;
-		}
-		else if (cur_start < LAST_BLOCK && cur_end > LAST_BLOCK) {
-			map_value[i] = (2 << (LAST_BLOCK - cur_start)) - 1;
-		}
-		else if (cur_start < (NUM_BLOCKS - 1) && cur_end > (NUM_BLOCKS - 1)) {
-			map_value[i] = (2 << 7) - (2 << (NUM_BLOCKS - 1 - cur_start));
-		}
-		else if (cur_end > (NUM_BLOCKS - 1)) {
-			map_value[i] = 0xFF;
-		}
-	}
-	if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE)
-	{
-		errno_exit("write");
-	}
+    // Write the updated bitmap to the disk image.
+    if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE) {
+        errno_exit("write");
+    }
 }
 
 void write_inode_bitmap(int fd)
 {
-	off_t off = lseek(fd, BLOCK_OFFSET(INODE_BITMAP_BLOCKNO), SEEK_SET);
-	if (off == -1)
-	{
-		errno_exit("lseek");
-	}
+    off_t off = lseek(fd, BLOCK_OFFSET(INODE_BITMAP_BLOCKNO), SEEK_SET);
+    if (off == -1) {
+        errno_exit("lseek");
+    }
 
-	// TODO It's all yours
-	u8 map_value[BLOCK_SIZE];
-	memset(map_value, 0, BLOCK_SIZE);
+    u8 map_value[BLOCK_SIZE];
+    memset(map_value, 0, BLOCK_SIZE); // Initialize all bits to 0.
 
-	for (int i = 0; i < BLOCK_SIZE; ++i) {
-		int cur_start = i * 8;
-		int cur_end = (i + 1) * 8;
+    // Mark inodes as used up to LAST_INO by setting the corresponding bits to 1.
+    for (int inode = 1; inode <= LAST_INO; inode++) { // Start from inode 1 as per convention.
+        int byteIndex = inode / 8;
+        int bitIndex = inode % 8;
+        map_value[byteIndex] |= (1 << bitIndex);
+    }
 
-		if (cur_end <= LAST_INO) {
-			map_value[i] = 0xFF;
-		}
-		else if (cur_start < LAST_INO && cur_end > LAST_INO) {
-			map_value[i] = (2 << (LAST_INO - cur_start)) - 1;
-		}
-		else if (cur_start < NUM_INODES && cur_end > NUM_INODES) {
-			map_value[i] = 0xFF - ((2 << (NUM_INODES - cur_start)) - 1);
-		}
-		else if (cur_end > NUM_INODES) {
-			map_value[i] = 0xFF;
-		}
-	}
-	if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE)
-	{
-		errno_exit("write");
-	}
+    // Write the updated bitmap to the disk image.
+    if (write(fd, map_value, BLOCK_SIZE) != BLOCK_SIZE) {
+        errno_exit("write");
+    }
 }
 
 void write_inode(int fd, u32 index, struct ext2_inode *inode) {
