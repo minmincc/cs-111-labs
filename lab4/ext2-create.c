@@ -408,27 +408,42 @@ void write_root_dir_block(int fd)
         errno_exit("lseek");
     }
 
-    struct ext2_dir_entry dir_entry = {0};
+    struct ext2_dir_entry dir_entry;
+    ssize_t bytes_remaining = BLOCK_SIZE;
 
-    // Entry for "."
+    // Entry for '.'
     dir_entry_set(dir_entry, EXT2_ROOT_INO, ".");
     dir_entry_write(dir_entry, fd);
+    bytes_remaining -= dir_entry.rec_len;
 
-    // Entry for ".." (Points back to itself in the root directory)
+    // Entry for '..' (Parent of root is root itself)
     dir_entry_set(dir_entry, EXT2_ROOT_INO, "..");
     dir_entry_write(dir_entry, fd);
+    bytes_remaining -= dir_entry.rec_len;
 
-    // Entry for "lost+found" directory
+    // Entry for 'lost+found'
     dir_entry_set(dir_entry, LOST_AND_FOUND_INO, "lost+found");
     dir_entry_write(dir_entry, fd);
+    bytes_remaining -= dir_entry.rec_len;
 
-    // Entry for "hello-world" file
+    // Entry for 'hello-world' file
     dir_entry_set(dir_entry, HELLO_WORLD_INO, "hello-world");
     dir_entry_write(dir_entry, fd);
+    bytes_remaining -= dir_entry.rec_len;
 
-    // Entry for "hello" symlink
+    // Entry for 'hello' symlink
     dir_entry_set(dir_entry, HELLO_INO, "hello");
     dir_entry_write(dir_entry, fd);
+    bytes_remaining -= dir_entry.rec_len;
+
+    // Fill the rest of the block with zeros if any space left
+    if (bytes_remaining > 0) {
+        char zero_buf[bytes_remaining];
+        memset(zero_buf, 0, sizeof(zero_buf));
+        if (write(fd, zero_buf, sizeof(zero_buf)) != sizeof(zero_buf)) {
+            errno_exit("write");
+        }
+    }
 }
 
 void write_lost_and_found_dir_block(int fd) {
